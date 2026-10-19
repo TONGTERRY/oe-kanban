@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>批量查询 · OE 竞品</title>
+<style>
+  :root{--navy:#1A365D;--teal:#2B6B7A;--amber:#C05621;--line:#E3E7E8;--mut:#6B7280}
+  body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;
+       font-family:-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;background:#F7F8F8;color:#1F2933}
+  .card{background:#fff;border:1.5px solid var(--line);border-radius:16px;padding:38px 42px;
+        width:min(92vw,500px);text-align:center;box-shadow:0 8px 30px rgba(26,54,93,.06)}
+  h1{font-size:19px;margin:0 0 6px;color:var(--navy)}
+  .sub{font-size:13px;color:var(--mut);margin-bottom:20px}
+  .spin{width:32px;height:32px;margin:0 auto 16px;border:3px solid #E3E9EC;border-top-color:var(--teal);
+        border-radius:50%;animation:r .9s linear infinite}
+  @keyframes r{to{transform:rotate(360deg)}}
+  .tip{font-size:12.5px;color:var(--mut);line-height:1.8}
+  .btn{display:inline-block;margin-top:14px;padding:9px 22px;border-radius:10px;background:var(--navy);color:#fff;text-decoration:none;font-size:13.5px}
+  .err{color:var(--amber);font-size:13px;margin-top:10px;line-height:1.7}
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="spin" id="sp"></div>
+  <h1>批量查询 · OE 竞品</h1>
+  <div class="sub" id="sub">正在连接服务…</div>
+  <div class="tip">这个地址永久有效；后端地址偶尔更新，本页会自动跟随。</div>
+  <a class="btn" id="go" href="#" style="display:none">打开批量查询</a>
+  <div class="err" id="err"></div>
+</div>
+<script>
+(function(){
+  var tries = 0;
+  function attempt(){
+    tries++;
+    fetch('../url.txt?t=' + Date.now(), {cache:'no-store'})
+      .then(function(r){ if(!r.ok) throw new Error('HTTP ' + r.status); return r.text(); })
+      .then(function(t){
+        var u = (t || '').trim().split('\n')[0].trim();
+        if(!/^https?:\/\//.test(u)) throw new Error('地址文件内容异常');
+        var target = u.replace(/\/+$/, '') + '/batch';
+        document.getElementById('go').href = target;
+        document.getElementById('go').style.display = 'inline-block';
+        location.replace(target);
+        setTimeout(function(){
+          document.getElementById('sp').style.display = 'none';
+          document.getElementById('sub').textContent = '如果没有自动跳转，请点下面的按钮';
+        }, 2500);
+      })
+      .catch(function(e){
+        document.getElementById('sp').style.display = 'none';
+        document.getElementById('sub').textContent = '服务地址正在更新';
+        document.getElementById('err').textContent = '（' + (e.message || '未取到地址') + '）本页每 15 秒自动重试。';
+        if(tries < 40) setTimeout(attempt, 15000);
+      });
+  }
+  attempt();
+})();
+</script>
+</body>
+</html>
