@@ -19,39 +19,69 @@
   .tip{font-size:12.5px;color:var(--mut);line-height:1.8}
   a{color:var(--teal);word-break:break-all}
   .btn{display:inline-block;margin-top:16px;padding:9px 22px;border-radius:10px;background:var(--navy);
-       color:#fff;text-decoration:none;font-size:13.5px}
-  .err{color:var(--amber);font-size:13px;margin-top:10px}
+       color:#fff;text-decoration:none;font-size:13.5px;border:0;cursor:pointer}
+  .btn.ghost{background:#fff;color:var(--navy);border:1.5px solid var(--line);margin-left:8px}
+  .err{color:var(--amber);font-size:13px;margin-top:12px;line-height:1.7}
 </style>
 </head>
 <body>
 <div class="card">
   <div class="spin" id="sp"></div>
   <h1>OE 竞品看板</h1>
-  <div class="sub">正在跳转到当前服务地址…</div>
-  <div class="tip">如果没有自动跳转，请点下面的按钮；<br>地址偶尔会更新（电脑重启后），本页会自动跟上。</div>
-  <a class="btn" id="go" href="#" style="display:none">打开看板</a>
+  <div class="sub" id="sub">正在连接服务…</div>
+  <div class="tip">这个地址永久有效；后端地址偶尔更新，本页会自动跟随。</div>
+  <div>
+    <a class="btn" id="go" href="#" style="display:none">打开看板</a>
+    <button class="btn ghost" id="again" style="display:none" onclick="location.reload()">刷新重试</button>
+  </div>
   <div class="err" id="err"></div>
 </div>
 <script>
 (function(){
-  var bust = '?t=' + Date.now();
-  fetch('url.txt' + bust, {cache:'no-store'})
-    .then(function(r){ if(!r.ok) throw new Error('HTTP ' + r.status); return r.text(); })
-    .then(function(t){
-      var u = (t || '').trim().split('\n')[0].trim();
-      if(!/^https?:\/\//.test(u)) throw new Error('地址文件内容异常');
-      document.getElementById('go').href = u;
+  var tries = 0;
+  function getUrl(){
+    return fetch('url.txt?t=' + Date.now(), {cache:'no-store'})
+      .then(function(r){ if(!r.ok) throw new Error('HTTP ' + r.status); return r.text(); })
+      .then(function(t){
+        var u = (t || '').trim().split('\n')[0].trim();
+        if(!/^https?:\/\//.test(u)) throw new Error('地址文件内容异常');
+        return u;
+      });
+  }
+  function probe(u){
+    return new Promise(function(res, rej){
+      var ctl = window.AbortController ? new AbortController() : null;
+      var timer = setTimeout(function(){ if(ctl) ctl.abort(); rej(new Error('服务无响应')); }, 7000);
+      var opt = {mode:'cors', cache:'no-store'};
+      if(ctl) opt.signal = ctl.signal;
+      fetch(u + '/api/oe_list?probe=1', opt)
+        .then(function(r){ clearTimeout(timer); if(r.ok) res(u); else rej(new Error('HTTP ' + r.status)); })
+        .catch(function(e){ clearTimeout(timer); rej(new Error('服务暂不可达')); });
+    });
+  }
+  function attempt(){
+    tries++;
+    document.getElementById('sp').style.display = 'block';
+    getUrl().then(probe).then(function(u){
+      var go = document.getElementById('go');
+      go.href = u; go.style.display = 'inline-block';
+      document.getElementById('sub').textContent = '正在跳转…';
       location.replace(u);
       setTimeout(function(){
         document.getElementById('sp').style.display = 'none';
-        document.getElementById('go').style.display = 'inline-block';
-        document.querySelector('.sub').textContent = '当前地址：' + u;
+        document.getElementById('again').style.display = 'inline-block';
+        document.getElementById('sub').textContent = '如果浏览器没有自动跳转，请点「打开看板」';
       }, 2500);
-    })
-    .catch(function(e){
+    }).catch(function(e){
       document.getElementById('sp').style.display = 'none';
-      document.getElementById('err').textContent = '暂时读不到最新地址（' + e.message + '），请稍后刷新，或联系童惊韬。';
+      document.getElementById('again').style.display = 'inline-block';
+      document.getElementById('sub').textContent = '服务地址正在更新';
+      document.getElementById('err').textContent =
+        '（' + (e && e.message ? e.message : '未取到地址') + '）后台一般 1-2 分钟同步完成，本页每 15 秒自动重试。';
+      if(tries < 40) setTimeout(attempt, 15000);   // 最多重试 10 分钟
     });
+  }
+  attempt();
 })();
 </script>
 </body>
