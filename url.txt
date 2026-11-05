@@ -1,1 +1,1 @@
-https://surgical-tribunal-burlington-deadline.trycloudflare.com
+https://api.trycloudflare.com
